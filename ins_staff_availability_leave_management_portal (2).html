@@ -1,0 +1,1205 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal de Disponibilidade e Ausências - INS Moçambique</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- SheetJS for Excel/CSV Importing and Exporting -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <!-- Inter Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- AUTHENTICATION MODAL / OVERLAY -->
+    <div id="auth-screen" class="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden">
+            <!-- Text Header (No Logos) -->
+            <div class="bg-slate-800 text-white p-6 text-center border-b border-slate-700">
+                <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-teal-500/20 text-teal-400 mb-3">
+                    <i data-lucide="shield-check" class="w-6 h-6"></i>
+                </div>
+                <h1 class="text-xl font-bold tracking-tight">INS Moçambique</h1>
+                <p class="text-xs text-slate-300 mt-1">Portal de Gestão de Disponibilidade e Viagens</p>
+            </div>
+
+            <!-- Login Form -->
+            <form onsubmit="handleLogin(event)" class="p-6 space-y-4">
+                <div id="login-error" class="hidden bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-xs flex items-center gap-2">
+                    <i data-lucide="alert-circle" class="w-4 h-4 shrink-0"></i>
+                    <span id="login-error-text">Credenciais inválidas.</span>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">E-mail do Utilizador</label>
+                    <div class="relative">
+                        <i data-lucide="mail" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                        <input type="email" id="login-email" required placeholder="utilizador@ins.gov.mz" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Palavra-passe</label>
+                    <div class="relative">
+                        <i data-lucide="key" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                        <input type="password" id="login-password" required placeholder="••••••••" class="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:bg-white">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium py-2.5 rounded-lg transition-colors text-sm shadow-md flex items-center justify-center gap-2">
+                    <i data-lucide="log-in" class="w-4 h-4"></i> Entrar na Plataforma
+                </button>
+
+                <!-- Quick Preset Account Buttons -->
+                <div class="pt-4 border-t border-slate-100">
+                    <p class="text-xs text-slate-500 mb-2 font-medium">Contas de Teste Pré-definidas:</p>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button type="button" onclick="fillCredentials('admin@ins.gov.mz', 'admin123')" class="text-left p-2 rounded border border-slate-200 hover:border-teal-500 hover:bg-teal-50/50 transition-all text-xs">
+                            <span class="font-bold block text-slate-800">Administrador</span>
+                            <span class="text-slate-500 text-[10px]">admin@ins.gov.mz</span>
+                        </button>
+                        <button type="button" onclick="fillCredentials('secretaria@ins.gov.mz', 'ins2026')" class="text-left p-2 rounded border border-slate-200 hover:border-teal-500 hover:bg-teal-50/50 transition-all text-xs">
+                            <span class="font-bold block text-slate-800">Secretariado</span>
+                            <span class="text-slate-500 text-[10px]">secretaria@ins.gov.mz</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MAIN APPLICATION WORKSPACE -->
+    <div id="app-container" class="hidden flex-1 flex flex-col md:flex-row min-h-screen">
+        
+        <!-- Sidebar Navigation -->
+        <aside class="w-full md:w-64 bg-slate-900 text-slate-300 flex-shrink-0 border-r border-slate-800 flex flex-col">
+            <!-- App Header (Simple Text Badge) -->
+            <div class="p-5 border-b border-slate-800">
+                <div class="flex items-center gap-2 text-teal-400 font-bold text-lg">
+                    <i data-lucide="building-2" class="w-6 h-6"></i>
+                    <span>INS MOÇAMBIQUE</span>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Gestão de Pessoal e Ausências</p>
+            </div>
+
+            <!-- Role Badge -->
+            <div class="px-5 py-3 bg-slate-950/50 border-b border-slate-800 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full bg-emerald-400"></div>
+                    <span id="current-user-role" class="text-xs font-semibold uppercase tracking-wider text-slate-300">Secretariado</span>
+                </div>
+                <button onclick="logout()" title="Sair" class="text-slate-400 hover:text-red-400 transition-colors p-1">
+                    <i data-lucide="log-out" class="w-4 h-4"></i>
+                </button>
+            </div>
+
+            <!-- Navigation Links -->
+            <nav class="flex-1 p-4 space-y-1">
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors bg-teal-600 text-white">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Painel Geral
+                </button>
+                <button onclick="switchTab('calendar')" id="nav-calendar" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 text-slate-400 hover:text-slate-200">
+                    <i data-lucide="calendar" class="w-4 h-4"></i> Calendário
+                </button>
+                <button onclick="switchTab('records')" id="nav-records" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 text-slate-400 hover:text-slate-200">
+                    <i data-lucide="file-text" class="w-4 h-4"></i> Missões & Licenças
+                </button>
+                <button onclick="switchTab('staff')" id="nav-staff" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 text-slate-400 hover:text-slate-200">
+                    <i data-lucide="users" class="w-4 h-4"></i> Funcionários
+                </button>
+                <button onclick="switchTab('import')" id="nav-import" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 text-slate-400 hover:text-slate-200">
+                    <i data-lucide="file-spread-sheet" class="w-4 h-4"></i> Importar Excel
+                </button>
+                <button onclick="switchTab('hosting')" id="nav-hosting" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-slate-800 text-slate-400 hover:text-slate-200">
+                    <i data-lucide="globe" class="w-4 h-4"></i> Como Publicar Grátis
+                </button>
+            </nav>
+
+            <!-- Bottom User Profile Summary -->
+            <div class="p-4 border-t border-slate-800 text-xs text-slate-400">
+                <p id="user-display-email" class="font-medium text-slate-300 truncate">secretaria@ins.gov.mz</p>
+                <p class="text-[10px] text-slate-500 mt-0.5">Sessão Ativa • INS 2026</p>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col min-w-0 overflow-y-auto">
+            
+            <!-- Top App Bar with Date Checker Widget -->
+            <header class="bg-white border-b border-slate-200 px-6 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sticky top-0 z-20 shadow-sm">
+                <div>
+                    <h2 id="page-title" class="text-xl font-bold text-slate-900">Painel & Disponibilidade</h2>
+                    <p id="page-subtitle" class="text-xs text-slate-500">Monitorização do estado e presença dos funcionários do INS</p>
+                </div>
+
+                <!-- Quick Date Checker Component -->
+                <div class="bg-slate-100 p-2 rounded-lg border border-slate-200 flex items-center gap-3 w-full sm:w-auto">
+                    <div class="flex items-center gap-2 text-xs font-semibold text-slate-700">
+                        <i data-lucide="calendar-search" class="w-4 h-4 text-teal-600"></i>
+                        <span>Consultar Data:</span>
+                    </div>
+                    <input type="date" id="quick-check-date" onchange="checkAvailabilityForDate()" class="bg-white border border-slate-300 rounded px-2 py-1 text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                    <button onclick="resetDateToToday()" class="text-[11px] bg-slate-200 hover:bg-slate-300 text-slate-700 font-medium px-2 py-1 rounded transition-colors">Hoje</button>
+                </div>
+            </header>
+
+            <!-- Main Dynamic Body Container -->
+            <div class="p-6 flex-1 space-y-6">
+
+                <!-- TAB 1: DASHBOARD -->
+                <div id="tab-dashboard" class="tab-content space-y-6">
+                    <!-- Summary Metric Cards -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Colaboradores</span>
+                                <div class="p-2 rounded-lg bg-slate-100 text-slate-600">
+                                    <i data-lucide="users" class="w-5 h-5"></i>
+                                </div>
+                            </div>
+                            <p id="stat-total-staff" class="text-2xl font-bold text-slate-900 mt-2">0</p>
+                            <span class="text-[11px] text-slate-500">Registados no sistema</span>
+                        </div>
+
+                        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Disponíveis Hoje</span>
+                                <div class="p-2 rounded-lg bg-emerald-50 text-emerald-600">
+                                    <i data-lucide="user-check" class="w-5 h-5"></i>
+                                </div>
+                            </div>
+                            <p id="stat-available" class="text-2xl font-bold text-emerald-600 mt-2">0</p>
+                            <span class="text-[11px] text-slate-500">No posto de trabalho</span>
+                        </div>
+
+                        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-semibold text-blue-600 uppercase tracking-wider">Em Missão / Deslocação</span>
+                                <div class="p-2 rounded-lg bg-blue-50 text-blue-600">
+                                    <i data-lucide="plane" class="w-5 h-5"></i>
+                                </div>
+                            </div>
+                            <p id="stat-traveling" class="text-2xl font-bold text-blue-600 mt-2">0</p>
+                            <span class="text-[11px] text-slate-500">Com Ordem de Serviço</span>
+                        </div>
+
+                        <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-semibold text-amber-600 uppercase tracking-wider">Férias / Licença</span>
+                                <div class="p-2 rounded-lg bg-amber-50 text-amber-600">
+                                    <i data-lucide="palmtree" class="w-5 h-5"></i>
+                                </div>
+                            </div>
+                            <p id="stat-leave" class="text-2xl font-bold text-amber-600 mt-2">0</p>
+                            <span class="text-[11px] text-slate-500">Ausências autorizadas</span>
+                        </div>
+                    </div>
+
+                    <!-- Quick Actions and Filters -->
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div class="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                            <div class="relative w-full sm:w-64">
+                                <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+                                <input type="text" id="dash-search" oninput="renderDashboardStaff()" placeholder="Pesquisar por nome ou NUIT..." class="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                            </div>
+
+                            <select id="dash-filter-dept" onchange="renderDashboardStaff()" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:ring-2 focus:ring-teal-500 outline-none">
+                                <option value="ALL">Todos os Departamentos</option>
+                                <option value="Direção Geral">Direção Geral</option>
+                                <option value="Inquéritos e Observação de Saúde">Inquéritos e Obs. de Saúde</option>
+                                <option value="Laboratórios de Saúde Pública">Laboratórios de Saúde Pública</option>
+                                <option value="Pesquisa em Saúde">Pesquisa em Saúde</option>
+                                <option value="Administração e Finanças">Administração e Finanças</option>
+                            </select>
+
+                            <select id="dash-filter-status" onchange="renderDashboardStaff()" class="bg-slate-50 border border-slate-300 rounded-lg px-3 py-1.5 text-xs text-slate-700 focus:ring-2 focus:ring-teal-500 outline-none">
+                                <option value="ALL">Todos os Estados</option>
+                                <option value="Disponível">Disponível</option>
+                                <option value="Em Missão">Em Missão</option>
+                                <option value="De Férias">De Férias</option>
+                                <option value="Baixa Médica">Baixa Médica</option>
+                            </select>
+                        </div>
+
+                        <div class="flex items-center gap-2 w-full md:w-auto justify-end">
+                            <button onclick="openRecordModal()" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 shadow-sm">
+                                <i data-lucide="plus-circle" class="w-4 h-4"></i> Registar Ausência/Missão
+                            </button>
+                            <button onclick="exportToCSV()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                                <i data-lucide="download" class="w-4 h-4"></i> Exportar CSV
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Staff Status List Table -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="p-4 border-b border-slate-200 flex items-center justify-between">
+                            <h3 class="font-bold text-slate-800 text-sm flex items-center gap-2">
+                                <i data-lucide="list" class="w-4 h-4 text-teal-600"></i> Status do Pessoal na Data Selecionada
+                                <span id="current-view-date-label" class="text-xs font-normal text-slate-500 bg-slate-100 px-2 py-0.5 rounded">Hoje</span>
+                            </h3>
+                        </div>
+
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-4 py-3">Funcionário</th>
+                                        <th class="px-4 py-3">Departamento / Cargo</th>
+                                        <th class="px-4 py-3">Estado Atual</th>
+                                        <th class="px-4 py-3">Detalhes do Registo</th>
+                                        <th class="px-4 py-3 text-right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dash-staff-tbody" class="divide-y divide-slate-200">
+                                    <!-- Dynamic Rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: INTERACTIVE CALENDAR -->
+                <div id="tab-calendar" class="tab-content hidden space-y-6">
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+                        <div class="flex items-center gap-4">
+                            <button onclick="changeCalendarMonth(-1)" class="p-2 border border-slate-300 rounded-lg hover:bg-slate-100"><i data-lucide="chevron-left" class="w-4 h-4"></i></button>
+                            <h3 id="calendar-month-year" class="text-base font-bold text-slate-800 min-w-32 text-center">Janeiro 2026</h3>
+                            <button onclick="changeCalendarMonth(1)" class="p-2 border border-slate-300 rounded-lg hover:bg-slate-100"><i data-lucide="chevron-right" class="w-4 h-4"></i></button>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs">
+                            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-blue-500"></span> Missão</span>
+                            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-amber-500"></span> Férias</span>
+                            <span class="inline-flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-red-500"></span> Baixa Médica</span>
+                        </div>
+                    </div>
+
+                    <!-- Calendar Grid -->
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 overflow-x-auto">
+                        <div class="grid grid-cols-7 gap-1 text-center font-semibold text-xs text-slate-500 mb-2 border-b border-slate-100 pb-2 min-w-[600px]">
+                            <div>Dom</div><div>Seg</div><div>Ter</div><div>Qua</div><div>Qui</div><div>Sex</div><div>Sáb</div>
+                        </div>
+                        <div id="calendar-days-grid" class="grid grid-cols-7 gap-1 min-w-[600px]">
+                            <!-- Calendar Days injected via JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: RECORDS (MISSÕES & LICENÇAS) -->
+                <div id="tab-records" class="tab-content hidden space-y-6">
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex justify-between items-center">
+                        <h3 class="font-bold text-slate-800 text-sm">Histórico e Registos Ativos de Viagens e Licenças</h3>
+                        <button onclick="openRecordModal()" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5">
+                            <i data-lucide="plus" class="w-4 h-4"></i> Novo Registo
+                        </button>
+                    </div>
+
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-4 py-3">Funcionário</th>
+                                        <th class="px-4 py-3">Tipo</th>
+                                        <th class="px-4 py-3">Período (Início - Fim)</th>
+                                        <th class="px-4 py-3">Destino / Motivo</th>
+                                        <th class="px-4 py-3">Ordem / Obs</th>
+                                        <th class="px-4 py-3 text-right">Ação</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="records-tbody" class="divide-y divide-slate-200">
+                                    <!-- Dynamic Records -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: STAFF DIRECTORY -->
+                <div id="tab-staff" class="tab-content hidden space-y-6">
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-center gap-3">
+                        <div class="relative w-full sm:w-72">
+                            <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+                            <input type="text" id="staff-search-input" oninput="renderStaffDirectory()" placeholder="Pesquisar funcionário..." class="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-300 rounded-lg text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="openStaffModal()" class="bg-teal-600 hover:bg-teal-700 text-white px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1">
+                                <i data-lucide="user-plus" class="w-4 h-4"></i> Adicionar Funcionário
+                            </button>
+                            <button onclick="switchTab('import')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1">
+                                <i data-lucide="upload" class="w-4 h-4"></i> Importar de Excel
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs">
+                                <thead class="bg-slate-50 text-slate-600 uppercase font-semibold border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-4 py-3">Nome</th>
+                                        <th class="px-4 py-3">NUIT</th>
+                                        <th class="px-4 py-3">Cargo</th>
+                                        <th class="px-4 py-3">Departamento</th>
+                                        <th class="px-4 py-3">Contacto</th>
+                                        <th class="px-4 py-3 text-right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="staff-directory-tbody" class="divide-y divide-slate-200">
+                                    <!-- Dynamic Staff List -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 5: EXCEL/CSV IMPORT -->
+                <div id="tab-import" class="tab-content hidden space-y-6">
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                                <i data-lucide="file-spreadsheet" class="w-5 h-5 text-teal-600"></i> Importação em Lote via Excel (.xlsx / .csv)
+                            </h3>
+                            <p class="text-xs text-slate-500 mt-1">Carregue a lista do pessoal para integrar diretamente na base de dados local do portal.</p>
+                        </div>
+
+                        <!-- Instruction Box -->
+                        <div class="bg-slate-50 border border-slate-200 rounded-lg p-4 space-y-3">
+                            <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                <i data-lucide="info" class="w-4 h-4 text-blue-600"></i> Instruções para Organização do Ficheiro Excel
+                            </h4>
+                            <p class="text-xs text-slate-600">O ficheiro Excel deve conter uma tabela simples com os cabeçalhos na primeira linha. Utilize a seguinte estrutura de colunas:</p>
+
+                            <div class="overflow-x-auto border border-slate-200 rounded-md bg-white">
+                                <table class="w-full text-left text-[11px] divide-y divide-slate-200">
+                                    <thead class="bg-slate-100 text-slate-700 font-bold">
+                                        <tr>
+                                            <th class="p-2">Nome</th>
+                                            <th class="p-2">NUIT</th>
+                                            <th class="p-2">Cargo</th>
+                                            <th class="p-2">Departamento</th>
+                                            <th class="p-2">Email</th>
+                                            <th class="p-2">Telefone</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 text-slate-600">
+                                        <tr>
+                                            <td class="p-2 font-medium">Dra. Amélia Cossa</td>
+                                            <td class="p-2">102938475</td>
+                                            <td class="p-2">Investigadora Principal</td>
+                                            <td class="p-2">Pesquisa em Saúde</td>
+                                            <td class="p-2">amelia.cossa@ins.gov.mz</td>
+                                            <td class="p-2">+258 84 123 4567</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button onclick="downloadExcelTemplate()" class="inline-flex items-center gap-1.5 text-xs text-teal-700 hover:text-teal-800 font-medium underline pt-1">
+                                <i data-lucide="download-cloud" class="w-4 h-4"></i> Descarregar Ficheiro Modelo Exemplo (.xlsx)
+                            </button>
+                        </div>
+
+                        <!-- Drop Zone / Upload Area -->
+                        <div class="border-2 border-dashed border-slate-300 hover:border-teal-500 rounded-xl p-8 text-center bg-slate-50/50 transition-colors">
+                            <i data-lucide="upload-cloud" class="w-10 h-10 text-slate-400 mx-auto mb-3"></i>
+                            <p class="text-sm font-medium text-slate-700">Arraste o ficheiro Excel ou clique para selecionar</p>
+                            <p class="text-xs text-slate-400 mt-1">Suporta formatos .xlsx, .xls, .csv</p>
+                            <input type="file" id="excel-file-input" accept=".xlsx, .xls, .csv" onchange="handleExcelUpload(event)" class="mt-4 text-xs mx-auto block text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-teal-50 file:text-teal-700 hover:file:bg-teal-100 cursor-pointer">
+                        </div>
+
+                        <!-- Import Preview Section -->
+                        <div id="import-preview-container" class="hidden space-y-3">
+                            <h4 class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center justify-between">
+                                <span>Pré-visualização dos Dados Importados</span>
+                                <span id="import-count-badge" class="bg-teal-100 text-teal-800 px-2 py-0.5 rounded text-[11px]">0 Registos</span>
+                            </h4>
+                            <div class="max-h-60 overflow-y-auto border border-slate-200 rounded-lg">
+                                <table class="w-full text-left text-xs">
+                                    <thead class="bg-slate-100 text-slate-700 sticky top-0">
+                                        <tr>
+                                            <th class="p-2">Nome</th>
+                                            <th class="p-2">NUIT</th>
+                                            <th class="p-2">Cargo</th>
+                                            <th class="p-2">Departamento</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="import-preview-tbody" class="divide-y divide-slate-200 bg-white">
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button onclick="confirmImportData()" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-medium py-2 rounded-lg text-xs shadow transition-colors flex items-center justify-center gap-2">
+                                <i data-lucide="check-circle-2" class="w-4 h-4"></i> Confirmar e Salvar Funcionários
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 6: FREE HOSTING INSTRUCTIONS -->
+                <div id="tab-hosting" class="tab-content hidden space-y-6">
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        <div class="flex items-center gap-3">
+                            <div class="p-3 bg-teal-50 text-teal-700 rounded-xl">
+                                <i data-lucide="rocket" class="w-6 h-6"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-base font-bold text-slate-900">Como Hospedar esta Plataforma Gratuitamente</h3>
+                                <p class="text-xs text-slate-500">Passos simples para disponibilizar esta aplicação online para os membros da secretaria testarem.</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                            <!-- Option 1: Vercel / Netlify -->
+                            <div class="border border-slate-200 p-4 rounded-xl space-y-2 bg-slate-50/50">
+                                <div class="flex items-center gap-2 text-teal-700 font-bold text-sm">
+                                    <span class="w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] flex items-center justify-center">1</span>
+                                    <span>Netlify Drop (Mais Fácil)</span>
+                                </div>
+                                <p class="text-xs text-slate-600">1. Aceda a <a href="https://app.netlify.com/drop" target="_blank" class="text-teal-700 font-semibold underline">app.netlify.com/drop</a>.<br>2. Arraste o ficheiro <code class="bg-slate-200 px-1 rounded">index.html</code> para a área assinalada.<br>3. Obterá um link público instantâneo (ex: <code class="bg-slate-200 px-1 rounded">https://ins-pessoal.netlify.app</code>).</p>
+                            </div>
+
+                            <!-- Option 2: GitHub Pages -->
+                            <div class="border border-slate-200 p-4 rounded-xl space-y-2 bg-slate-50/50">
+                                <div class="flex items-center gap-2 text-teal-700 font-bold text-sm">
+                                    <span class="w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] flex items-center justify-center">2</span>
+                                    <span>GitHub Pages</span>
+                                </div>
+                                <p class="text-xs text-slate-600">1. Crie um repositório no GitHub chamado <code class="bg-slate-200 px-1 rounded">ins-pessoal</code>.<br>2. Faça upload do ficheiro <code class="bg-slate-200 px-1 rounded">index.html</code>.<br>3. Nas definições do repositório, ative o "Pages" no ramo main.</p>
+                            </div>
+
+                            <!-- Option 3: Vercel -->
+                            <div class="border border-slate-200 p-4 rounded-xl space-y-2 bg-slate-50/50">
+                                <div class="flex items-center gap-2 text-teal-700 font-bold text-sm">
+                                    <span class="w-5 h-5 rounded-full bg-teal-600 text-white text-[11px] flex items-center justify-center">3</span>
+                                    <span>Vercel</span>
+                                </div>
+                                <p class="text-xs text-slate-600">1. Aceda a <a href="https://vercel.com" target="_blank" class="text-teal-700 font-semibold underline">vercel.com</a>.<br>2. Importe o seu projeto HTML.<br>3. Publicação em segundos com certificado SSL/HTTPS seguro gratuito.</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-xs flex items-start gap-2">
+                            <i data-lucide="shield-alert" class="w-4 h-4 text-amber-600 shrink-0 mt-0.5"></i>
+                            <span><strong>Nota sobre Dados:</strong> Toda a informação (funcionários, missões) é guardada em memória local (LocalStorage) no navegador do utilizador de forma rápida e segura sem necessidade de servidor de base de dados.</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL: ADD / EDIT TRAVEL OR LEAVE RECORD -->
+    <div id="record-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-lg overflow-hidden">
+            <div class="bg-slate-800 text-white px-6 py-4 flex items-center justify-between">
+                <h3 id="record-modal-title" class="font-bold text-sm flex items-center gap-2">
+                    <i data-lucide="calendar-plus" class="w-4 h-4 text-teal-400"></i> Registar Nova Ausência ou Missão
+                </h3>
+                <button onclick="closeRecordModal()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <!-- Overlap Warning Banner -->
+            <div id="conflict-warning" class="hidden bg-red-50 border-b border-red-200 p-4 text-xs text-red-800 space-y-1">
+                <div class="font-bold flex items-center gap-1.5 text-red-700">
+                    <i data-lucide="alert-triangle" class="w-4 h-4"></i> CONFLITO DE DATAS DETETADO!
+                </div>
+                <p id="conflict-warning-details">Este funcionário já possui uma missão/licença sobreposta no período selecionado.</p>
+            </div>
+
+            <form onsubmit="handleSaveRecord(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Funcionário *</label>
+                    <select id="rec-staff-id" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                        <!-- Dynamic Staff Options -->
+                    </select>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Tipo de Registo *</label>
+                        <select id="rec-type" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                            <option value="Em Missão">Em Missão (Deslocação)</option>
+                            <option value="De Férias">De Férias</option>
+                            <option value="Baixa Médica">Baixa Médica</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Nº Ordem de Serviço / GUIA</label>
+                        <input type="text" id="rec-order-num" placeholder="Ex: OS-2026/042" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Data de Início *</label>
+                        <input type="date" id="rec-start-date" required onchange="checkFormConflict()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Data do Fim *</label>
+                        <input type="date" id="rec-end-date" required onchange="checkFormConflict()" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Destino / Local de Trabalho</label>
+                    <input type="text" id="rec-location" placeholder="Ex: Província de Nampula / Hospital Central" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Objetivo / Observações</label>
+                    <textarea id="rec-reason" rows="2" placeholder="Breve descrição dos trabalhos a realizar..." class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none"></textarea>
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="closeRecordModal()" class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-50">Cancelar</button>
+                    <button type="submit" id="rec-save-btn" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-medium shadow">Salvar Registo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: ADD / EDIT STAFF -->
+    <div id="staff-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden">
+            <div class="bg-slate-800 text-white px-6 py-4 flex items-center justify-between">
+                <h3 class="font-bold text-sm flex items-center gap-2">
+                    <i data-lucide="user-plus" class="w-4 h-4 text-teal-400"></i> Adicionar Colaborador
+                </h3>
+                <button onclick="closeStaffModal()" class="text-slate-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
+            </div>
+
+            <form onsubmit="handleSaveStaff(event)" class="p-6 space-y-4">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Nome Completo *</label>
+                    <input type="text" id="staff-name" required placeholder="Ex: Dr. Paulo Sitoe" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">NUIT *</label>
+                        <input type="text" id="staff-nuit" required placeholder="109283746" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Telefone</label>
+                        <input type="text" id="staff-phone" placeholder="+258 84 000 0000" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Departamento *</label>
+                    <select id="staff-dept" required class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                        <option value="Direção Geral">Direção Geral</option>
+                        <option value="Inquéritos e Observação de Saúde">Inquéritos e Observação de Saúde</option>
+                        <option value="Laboratórios de Saúde Pública">Laboratórios de Saúde Pública</option>
+                        <option value="Pesquisa em Saúde">Pesquisa em Saúde</option>
+                        <option value="Administração e Finanças">Administração e Finanças</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Cargo / Função</label>
+                    <input type="text" id="staff-role" placeholder="Ex: Técnico de Laboratório" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">E-mail</label>
+                    <input type="email" id="staff-email" placeholder="nome@ins.gov.mz" class="w-full bg-slate-50 border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-teal-500 outline-none">
+                </div>
+
+                <div class="flex items-center justify-end gap-2 pt-4 border-t border-slate-100">
+                    <button type="button" onclick="closeStaffModal()" class="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-xs font-medium hover:bg-slate-50">Cancelar</button>
+                    <button type="submit" class="px-4 py-2 bg-teal-600 hover:bg-teal-700 text-white rounded-lg text-xs font-medium shadow">Salvar Colaborador</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        /* APP STATE & MOCK DATA */
+        let currentUser = null;
+        let selectedCheckDate = new Date().toISOString().split('T')[0];
+        let currentCalDate = new Date();
+        let parsedExcelData = [];
+
+        // Pre-loaded realistic sample data for testing
+        let staffList = [
+            { id: '1', name: 'Dr. Eduardo Samo Gudo', nuit: '102938475', dept: 'Direção Geral', role: 'Director Geral', email: 'eduardo.gudo@ins.gov.mz', phone: '+258 84 100 0001' },
+            { id: '2', name: 'Dra. Ilesh Jani', nuit: '109823746', dept: 'Pesquisa em Saúde', role: 'Investigador Sénior', email: 'ilesh.jani@ins.gov.mz', phone: '+258 84 100 0002' },
+            { id: '3', name: 'Dra. Sofia Viegas', nuit: '108273645', dept: 'Laboratórios de Saúde Pública', role: 'Chefe de Laboratório', email: 'sofia.viegas@ins.gov.mz', phone: '+258 84 100 0003' },
+            { id: '4', name: 'Dr. Nilsa de Deus', nuit: '103827194', dept: 'Inquéritos e Observação de Saúde', role: 'Especialista em Epidemiologia', email: 'nilsa.deus@ins.gov.mz', phone: '+258 84 100 0004' },
+            { id: '5', name: 'Dr. Sergio Chicumbe', nuit: '104729183', dept: 'Pesquisa em Saúde', role: 'Investigador Principal', email: 'sergio.chicumbe@ins.gov.mz', phone: '+258 84 100 0005' },
+            { id: '6', name: 'Mário Matsinhe', nuit: '105829371', dept: 'Administração e Finanças', role: 'Gestor Financeiro', email: 'mario.matsinhe@ins.gov.mz', phone: '+258 84 100 0006' }
+        ];
+
+        let recordsList = [
+            { id: 'r1', staffId: '2', type: 'Em Missão', startDate: '2026-03-01', endDate: '2026-03-10', location: 'Província de Sofala', reason: 'Supervisão do Inquérito Epidemiológico', orderNum: 'OS-2026/012' },
+            { id: 'r2', staffId: '3', type: 'De Férias', startDate: '2026-03-05', endDate: '2026-03-20', location: 'Maputo', reason: 'Férias Anuais Regulamentares', orderNum: 'LIC-2026/004' },
+            { id: 'r3', staffId: '5', type: 'Baixa Médica', startDate: '2026-03-02', endDate: '2026-03-06', location: 'Maputo', reason: 'Tratamento de Saúde', orderNum: 'BM-2026/001' }
+        ];
+
+        window.onload = function() {
+            lucide.createIcons();
+            document.getElementById('quick-check-date').value = selectedCheckDate;
+            
+            // Load saved state if any
+            if(localStorage.getItem('ins_staff_list')) {
+                staffList = JSON.parse(localStorage.getItem('ins_staff_list'));
+            }
+            if(localStorage.getItem('ins_records_list')) {
+                recordsList = JSON.parse(localStorage.getItem('ins_records_list'));
+            }
+        };
+
+        function fillCredentials(email, pass) {
+            document.getElementById('login-email').value = email;
+            document.getElementById('login-password').value = pass;
+        }
+
+        function handleLogin(e) {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value.trim();
+            const pass = document.getElementById('login-password').value.trim();
+
+            if (email === 'admin@ins.gov.mz' && pass === 'admin123') {
+                currentUser = { name: 'Administrador Principal', email, role: 'Administrador' };
+            } else if (email === 'secretaria@ins.gov.mz' && pass === 'ins2026') {
+                currentUser = { name: 'Secretariado Geral', email, role: 'Secretariado' };
+            } else {
+                document.getElementById('login-error').classList.remove('hidden');
+                return;
+            }
+
+            document.getElementById('login-error').classList.add('hidden');
+            document.getElementById('auth-screen').classList.add('hidden');
+            document.getElementById('app-container').classList.remove('hidden');
+
+            document.getElementById('current-user-role').innerText = currentUser.role;
+            document.getElementById('user-display-email').innerText = currentUser.email;
+
+            renderDashboard();
+            renderRecordsTable();
+            renderStaffDirectory();
+            renderCalendar();
+            populateStaffDropdowns();
+        }
+
+        function logout() {
+            currentUser = null;
+            document.getElementById('app-container').classList.add('hidden');
+            document.getElementById('auth-screen').classList.remove('hidden');
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-teal-600', 'text-white');
+                btn.classList.add('text-slate-400', 'hover:bg-slate-800', 'hover:text-slate-200');
+            });
+
+            document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+            const activeNav = document.getElementById(`nav-${tabId}`);
+            if (activeNav) {
+                activeNav.classList.add('bg-teal-600', 'text-white');
+                activeNav.classList.remove('text-slate-400', 'hover:bg-slate-800');
+            }
+
+            // Tab-specific refreshes
+            if (tabId === 'calendar') renderCalendar();
+            if (tabId === 'dashboard') renderDashboard();
+            if (tabId === 'records') renderRecordsTable();
+            if (tabId === 'staff') renderStaffDirectory();
+        }
+
+        function checkOverlapConflict(staffId, startDate, endDate, ignoreRecordId = null) {
+            if (!staffId || !startDate || !endDate) return null;
+
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+
+            for (let rec of recordsList) {
+                if (rec.staffId === staffId && rec.id !== ignoreRecordId) {
+                    const recStart = new Date(rec.startDate);
+                    const recEnd = new Date(rec.endDate);
+
+                    // Overlap logic: (StartA <= EndB) and (EndA >= StartB)
+                    if (start <= recEnd && end >= recStart) {
+                        return rec; // Conflict found
+                    }
+                }
+            }
+            return null; // No conflict
+        }
+
+        function checkFormConflict() {
+            const staffId = document.getElementById('rec-staff-id').value;
+            const start = document.getElementById('rec-start-date').value;
+            const end = document.getElementById('rec-end-date').value;
+            const warnBox = document.getElementById('conflict-warning');
+            const saveBtn = document.getElementById('rec-save-btn');
+
+            const conflict = checkOverlapConflict(staffId, start, end);
+            if (conflict) {
+                const staff = staffList.find(s => s.id === staffId);
+                document.getElementById('conflict-warning-details').innerText = 
+                    `${staff ? staff.name : 'Colaborador'} já tem [${conflict.type}] registado entre ${conflict.startDate} e ${conflict.endDate} (${conflict.location || 'Sem local'}).`;
+                warnBox.classList.remove('hidden');
+                saveBtn.disabled = true;
+                saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            } else {
+                warnBox.classList.add('hidden');
+                saveBtn.disabled = false;
+                saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        function checkAvailabilityForDate() {
+            selectedCheckDate = document.getElementById('quick-check-date').value;
+            document.getElementById('current-view-date-label').innerText = selectedCheckDate;
+            renderDashboard();
+        }
+
+        function resetDateToToday() {
+            selectedCheckDate = new Date().toISOString().split('T')[0];
+            document.getElementById('quick-check-date').value = selectedCheckDate;
+            document.getElementById('current-view-date-label').innerText = 'Hoje (' + selectedCheckDate + ')';
+            renderDashboard();
+        }
+
+        function renderDashboard() {
+            renderDashboardStaff();
+        }
+
+        function renderDashboardStaff() {
+            const search = document.getElementById('dash-search')?.value.toLowerCase() || '';
+            const dept = document.getElementById('dash-filter-dept')?.value || 'ALL';
+            const statusFilter = document.getElementById('dash-filter-status')?.value || 'ALL';
+
+            const checkDate = new Date(selectedCheckDate);
+
+            let countTotal = staffList.length;
+            let countAvailable = 0;
+            let countTravel = 0;
+            let countLeave = 0;
+
+            const tbody = document.getElementById('dash-staff-tbody');
+            tbody.innerHTML = '';
+
+            staffList.forEach(staff => {
+                // Find active record on selected checkDate
+                const activeRec = recordsList.find(r => {
+                    if (r.staffId !== staff.id) return false;
+                    const s = new Date(r.startDate);
+                    const e = new Date(r.endDate);
+                    return checkDate >= s && checkDate <= e;
+                });
+
+                let currentStatus = 'Disponível';
+                if (activeRec) {
+                    currentStatus = activeRec.type;
+                }
+
+                // Update metrics
+                if (currentStatus === 'Disponível') countAvailable++;
+                else if (currentStatus === 'Em Missão') countTravel++;
+                else countLeave++;
+
+                // Apply Filters
+                const matchesSearch = staff.name.toLowerCase().includes(search) || staff.nuit.includes(search);
+                const matchesDept = (dept === 'ALL' || staff.dept === dept);
+                const matchesStatus = (statusFilter === 'ALL' || currentStatus === statusFilter);
+
+                if (matchesSearch && matchesDept && matchesStatus) {
+                    let statusBadge = '<span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">Disponível</span>';
+                    if (currentStatus === 'Em Missão') {
+                        statusBadge = '<span class="bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-semibold">Em Missão</span>';
+                    } else if (currentStatus === 'De Férias') {
+                        statusBadge = '<span class="bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-semibold">De Férias</span>';
+                    } else if (currentStatus === 'Baixa Médica') {
+                        statusBadge = '<span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-semibold">Baixa Médica</span>';
+                    }
+
+                    const row = document.createElement('tr');
+                    row.className = 'hover:bg-slate-50 transition-colors';
+                    row.innerHTML = `
+                        <td class="px-4 py-3 font-medium text-slate-900">
+                            <div>${staff.name}</div>
+                            <div class="text-[10px] text-slate-500">NUIT: ${staff.nuit}</div>
+                        </td>
+                        <td class="px-4 py-3">
+                            <div class="font-medium text-slate-800">${staff.role || '—'}</div>
+                            <div class="text-[10px] text-slate-500">${staff.dept}</div>
+                        </td>
+                        <td class="px-4 py-3">${statusBadge}</td>
+                        <td class="px-4 py-3 text-slate-600">
+                            ${activeRec ? `
+                                <div class="font-semibold text-slate-800">${activeRec.location || 'Sem local'}</div>
+                                <div class="text-[10px] text-slate-500">${activeRec.startDate} a ${activeRec.endDate} (${activeRec.orderNum || 'S/ N.º'})</div>
+                            ` : '<span class="text-slate-400 font-italic">No posto de trabalho</span>'}
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <button onclick="openRecordModalForStaff('${staff.id}')" class="text-teal-600 hover:text-teal-800 font-medium text-xs">
+                                + Agendar
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                }
+            });
+
+            // Update Metric Cards
+            document.getElementById('stat-total-staff').innerText = countTotal;
+            document.getElementById('stat-available').innerText = countAvailable;
+            document.getElementById('stat-traveling').innerText = countTravel;
+            document.getElementById('stat-leave').innerText = countLeave;
+            
+            lucide.createIcons();
+        }
+
+        function renderCalendar() {
+            const monthYearLabel = document.getElementById('calendar-month-year');
+            const grid = document.getElementById('calendar-days-grid');
+            grid.innerHTML = '';
+
+            const year = currentCalDate.getFullYear();
+            const month = currentCalDate.getMonth();
+
+            const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+            monthYearLabel.innerText = `${monthNames[month]} ${year}`;
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+            // Padding Days
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'h-24 bg-slate-50/50 border border-slate-100 rounded';
+                grid.appendChild(emptyCell);
+            }
+
+            // Calendar Days
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayDateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const cell = document.createElement('div');
+                cell.className = 'h-24 border border-slate-200 rounded p-1 bg-white overflow-hidden flex flex-col hover:border-teal-400 transition-colors';
+
+                const dayNum = document.createElement('span');
+                dayNum.className = 'text-xs font-bold text-slate-700 mb-1';
+                dayNum.innerText = day;
+                cell.appendChild(dayNum);
+
+                // Add active events on this day
+                const currentCellDate = new Date(dayDateStr);
+                recordsList.forEach(rec => {
+                    const s = new Date(rec.startDate);
+                    const e = new Date(rec.endDate);
+
+                    if (currentCellDate >= s && currentCellDate <= e) {
+                        const staff = staffList.find(st => st.id === rec.staffId);
+                        const badge = document.createElement('div');
+                        let colorClass = 'bg-blue-500 text-white';
+                        if (rec.type === 'De Férias') colorClass = 'bg-amber-500 text-white';
+                        if (rec.type === 'Baixa Médica') colorClass = 'bg-red-500 text-white';
+
+                        badge.className = `${colorClass} text-[9px] px-1 py-0.5 rounded truncate mb-0.5 font-medium`;
+                        badge.title = `${staff ? staff.name : 'Pessoa'} - ${rec.type} (${rec.location})`;
+                        badge.innerText = staff ? staff.name.split(' ')[0] + ' ' + (staff.name.split(' ')[1] || '') : 'Ausência';
+                        cell.appendChild(badge);
+                    }
+                });
+
+                grid.appendChild(cell);
+            }
+        }
+
+        function changeCalendarMonth(delta) {
+            currentCalDate.setMonth(currentCalDate.getMonth() + delta);
+            renderCalendar();
+        }
+
+        function renderRecordsTable() {
+            const tbody = document.getElementById('records-tbody');
+            tbody.innerHTML = '';
+
+            recordsList.forEach(rec => {
+                const staff = staffList.find(s => s.id === rec.staffId);
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-slate-50 transition-colors';
+                row.innerHTML = `
+                    <td class="px-4 py-3 font-medium text-slate-900">${staff ? staff.name : 'N/A'}</td>
+                    <td class="px-4 py-3">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-bold ${rec.type === 'Em Missão' ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}">
+                            ${rec.type}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 text-slate-700">${rec.startDate} até ${rec.endDate}</td>
+                    <td class="px-4 py-3 text-slate-700">${rec.location || '—'}</td>
+                    <td class="px-4 py-3 text-slate-500 text-[11px]">${rec.orderNum || '—'}</td>
+                    <td class="px-4 py-3 text-right">
+                        <button onclick="deleteRecord('${rec.id}')" class="text-red-500 hover:text-red-700"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            lucide.createIcons();
+        }
+
+        function renderStaffDirectory() {
+            const search = document.getElementById('staff-search-input')?.value.toLowerCase() || '';
+            const tbody = document.getElementById('staff-directory-tbody');
+            tbody.innerHTML = '';
+
+            staffList.filter(s => s.name.toLowerCase().includes(search) || s.nuit.includes(search)).forEach(staff => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-slate-50 transition-colors';
+                row.innerHTML = `
+                    <td class="px-4 py-3 font-medium text-slate-900">${staff.name}</td>
+                    <td class="px-4 py-3 text-slate-600">${staff.nuit}</td>
+                    <td class="px-4 py-3 text-slate-700">${staff.role || '—'}</td>
+                    <td class="px-4 py-3 text-slate-700">${staff.dept}</td>
+                    <td class="px-4 py-3 text-slate-500">${staff.phone || staff.email || '—'}</td>
+                    <td class="px-4 py-3 text-right">
+                        <button onclick="deleteStaff('${staff.id}')" class="text-red-500 hover:text-red-700"><i data-lucide="user-x" class="w-4 h-4"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+            lucide.createIcons();
+        }
+
+        function openRecordModal() {
+            document.getElementById('record-modal').classList.remove('hidden');
+            document.getElementById('conflict-warning').classList.add('hidden');
+            document.getElementById('rec-save-btn').disabled = false;
+            document.getElementById('rec-save-btn').classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        function openRecordModalForStaff(staffId) {
+            openRecordModal();
+            document.getElementById('rec-staff-id').value = staffId;
+        }
+
+        function closeRecordModal() {
+            document.getElementById('record-modal').classList.add('hidden');
+        }
+
+        function handleSaveRecord(e) {
+            e.preventDefault();
+            const staffId = document.getElementById('rec-staff-id').value;
+            const type = document.getElementById('rec-type').value;
+            const startDate = document.getElementById('rec-start-date').value;
+            const endDate = document.getElementById('rec-end-date').value;
+            const location = document.getElementById('rec-location').value;
+            const reason = document.getElementById('rec-reason').value;
+            const orderNum = document.getElementById('rec-order-num').value;
+
+            // Final Conflict Guard
+            const conflict = checkOverlapConflict(staffId, startDate, endDate);
+            if (conflict) {
+                alert('Impossível guardar: O colaborador tem uma ausência/missão em sobreposição neste período!');
+                return;
+            }
+
+            const newRec = {
+                id: 'r_' + Date.now(),
+                staffId,
+                type,
+                startDate,
+                endDate,
+                location,
+                reason,
+                orderNum
+            };
+
+            recordsList.push(newRec);
+            localStorage.setItem('ins_records_list', JSON.stringify(recordsList));
+
+            closeRecordModal();
+            renderDashboard();
+            renderRecordsTable();
+            renderCalendar();
+        }
+
+        function openStaffModal() {
+            document.getElementById('staff-modal').classList.remove('hidden');
+        }
+
+        function closeStaffModal() {
+            document.getElementById('staff-modal').classList.add('hidden');
+        }
+
+        function handleSaveStaff(e) {
+            e.preventDefault();
+            const name = document.getElementById('staff-name').value;
+            const nuit = document.getElementById('staff-nuit').value;
+            const dept = document.getElementById('staff-dept').value;
+            const role = document.getElementById('staff-role').value;
+            const email = document.getElementById('staff-email').value;
+            const phone = document.getElementById('staff-phone').value;
+
+            const newStaff = {
+                id: 's_' + Date.now(),
+                name,
+                nuit,
+                dept,
+                role,
+                email,
+                phone
+            };
+
+            staffList.push(newStaff);
+            localStorage.setItem('ins_staff_list', JSON.stringify(staffList));
+
+            closeStaffModal();
+            populateStaffDropdowns();
+            renderStaffDirectory();
+            renderDashboard();
+        }
+
+        function populateStaffDropdowns() {
+            const select = document.getElementById('rec-staff-id');
+            select.innerHTML = '';
+            staffList.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.innerText = `${s.name} (${s.dept})`;
+                select.appendChild(opt);
+            });
+        }
+
+        function deleteRecord(id) {
+            if (confirm('Tem a certeza que deseja eliminar este registo de ausência?')) {
+                recordsList = recordsList.filter(r => r.id !== id);
+                localStorage.setItem('ins_records_list', JSON.stringify(recordsList));
+                renderRecordsTable();
+                renderDashboard();
+                renderCalendar();
+            }
+        }
+
+        function deleteStaff(id) {
+            if (confirm('Tem a certeza que deseja remover este funcionário do sistema?')) {
+                staffList = staffList.filter(s => s.id !== id);
+                localStorage.setItem('ins_staff_list', JSON.stringify(staffList));
+                renderStaffDirectory();
+                renderDashboard();
+                populateStaffDropdowns();
+            }
+        }
+
+        function handleExcelUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                const firstSheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[firstSheetName];
+                const json = XLSX.utils.sheet_to_json(worksheet);
+
+                parsedExcelData = json.map(row => ({
+                    name: row.Nome || row.NOME || row.nome || 'Funcionário Sem Nome',
+                    nuit: String(row.NUIT || row.Nuit || row.nuit || '000000000'),
+                    role: row.Cargo || row.CARGO || row.cargo || 'Técnico',
+                    dept: row.Departamento || row.DEPARTAMENTO || row.departamento || 'Pesquisa em Saúde',
+                    email: row.Email || row.EMAIL || '',
+                    phone: row.Telefone || row.TELEFONE || ''
+                }));
+
+                // Render Preview
+                const tbody = document.getElementById('import-preview-tbody');
+                tbody.innerHTML = '';
+                parsedExcelData.forEach(item => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td class="p-2 font-medium text-slate-800">${item.name}</td>
+                        <td class="p-2">${item.nuit}</td>
+                        <td class="p-2">${item.role}</td>
+                        <td class="p-2">${item.dept}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('import-count-badge').innerText = `${parsedExcelData.length} Registos Encontrados`;
+                document.getElementById('import-preview-container').classList.remove('hidden');
+            };
+            reader.readAsArrayBuffer(file);
+        }
+
+        function confirmImportData() {
+            if (!parsedExcelData.length) return;
+
+            parsedExcelData.forEach(item => {
+                staffList.push({
+                    id: 's_' + Date.now() + Math.random().toString(36).substr(2, 4),
+                    ...item
+                });
+            });
+
+            localStorage.setItem('ins_staff_list', JSON.stringify(staffList));
+            alert(`${parsedExcelData.length} funcionários importados com sucesso!`);
+            
+            parsedExcelData = [];
+            document.getElementById('import-preview-container').classList.add('hidden');
+            document.getElementById('excel-file-input').value = '';
+            
+            populateStaffDropdowns();
+            renderStaffDirectory();
+            renderDashboard();
+            switchTab('staff');
+        }
+
+        function downloadExcelTemplate() {
+            const templateData = [
+                { Nome: "Dr. Amélia Cossa", NUIT: "102938475", Cargo: "Investigador Principal", Departamento: "Pesquisa em Saúde", Email: "amelia.cossa@ins.gov.mz", Telefone: "+258 84 123 4567" },
+                { Nome: "Técnico João Mabote", NUIT: "109876543", Cargo: "Analista de Laboratório", Departamento: "Laboratórios de Saúde Pública", Email: "joao.mabote@ins.gov.mz", Telefone: "+258 84 987 6543" }
+            ];
+            const ws = XLSX.utils.json_to_sheet(templateData);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Funcionarios_INS");
+            XLSX.writeFile(wb, "Modelo_Importacao_INS.xlsx");
+        }
+
+        function exportToCSV() {
+            let csvContent = "data:text/csv;charset=utf-8,Nome,NUIT,Departamento,Cargo,Estado_Data_Atual,Local_Missao\n";
+            const checkDate = new Date(selectedCheckDate);
+
+            staffList.forEach(staff => {
+                const activeRec = recordsList.find(r => {
+                    if (r.staffId !== staff.id) return false;
+                    const s = new Date(r.startDate);
+                    const e = new Date(r.endDate);
+                    return checkDate >= s && checkDate <= e;
+                });
+
+                const status = activeRec ? activeRec.type : 'Disponivel';
+                const location = activeRec ? (activeRec.location || 'N/A') : 'No Posto';
+
+                csvContent += `"${staff.name}","${staff.nuit}","${staff.dept}","${staff.role || ''}","${status}","${location}"\n`;
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Relatorio_Disponibilidade_INS_${selectedCheckDate}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
